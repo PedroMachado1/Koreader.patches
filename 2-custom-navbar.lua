@@ -43,10 +43,12 @@ local config_default = {
         favorites = false,
         collections = false,
         zlib = false,
+        annas = false,
         appstore = false,
         exit = false,
     },
-    tab_order = { "books", "manga", "news", "continue", "history", "favorites", "collections", "zlib", "appstore", "exit" },
+    tab_order = { "books", "manga", "news", "continue", "history", "favorites", "collections", "zlib", "annas", "appstore", "exit" },
+    custom_tabs = {}, -- list of { id, label, icon, dispatcher_action }
     show_labels = true,
     show_top_border = true,
     books_label = "Books",
@@ -93,6 +95,19 @@ local function loadConfig()
                 table.insert(config.tab_order, v)
             end
         end
+        -- Also ensure custom tab ids are in tab_order
+        if type(config.custom_tabs) == "table" then
+            for _, ct in ipairs(config.custom_tabs) do
+                if ct.id and not order_set[ct.id] then
+                    table.insert(config.tab_order, ct.id)
+                    order_set[ct.id] = true
+                end
+            end
+        end
+    end
+    -- Ensure custom_tabs exists
+    if type(config.custom_tabs) ~= "table" then
+        config.custom_tabs = {}
     end
     return config
 end
@@ -147,6 +162,11 @@ local tabs = {
         icon = "appbar.search",
     },
     {
+        id = "annas",
+        label = _("Anna's"),
+        icon = "appbar.search",
+    },
+    {
         id = "appstore",
         label = _("AppStore"),
         icon = "tab_collections",
@@ -162,6 +182,38 @@ local tabs_by_id = {}
 for _, tab in ipairs(tabs) do
     tabs_by_id[tab.id] = tab
 end
+
+-- Register custom tabs from config into tabs/tabs_by_id
+local function registerCustomTabs()
+    -- Remove previously registered custom tabs from tabs list
+    for i = #tabs, 1, -1 do
+        if tabs[i].is_custom then
+            table.remove(tabs, i)
+        end
+    end
+    -- Clear stale custom entries from tabs_by_id
+    for k, v in pairs(tabs_by_id) do
+        if v.is_custom then tabs_by_id[k] = nil end
+    end
+    -- Add current custom tabs
+    for _, ct in ipairs(config.custom_tabs) do
+        if ct.id and ct.label then
+            local entry = {
+                id = ct.id,
+                label = ct.label,
+                icon = ct.icon or "appbar.search",
+                is_custom = true,
+            }
+            table.insert(tabs, entry)
+            tabs_by_id[ct.id] = entry
+            if config.show_tabs[ct.id] == nil then
+                config.show_tabs[ct.id] = true
+            end
+        end
+    end
+end
+
+registerCustomTabs()
 
 -- === Active tab tracking ===
 
@@ -329,6 +381,57 @@ local function onTabAppStore()
     end
 end
 
+local function onTabAnnas()
+    local fm = FileManager.instance
+    if not fm then return end
+
+    -- plugin name is T("Anna's Archive"), try all likely key variants
+    local annas = fm["Anna's Archive"] or fm["annas"] or fm["annasarchive"]
+    if not annas then
+        -- fallback: scan fm for a plugin with showSearchDialog
+        for k, v in pairs(fm) do
+            if type(k) == "string" and k:lower():find("anna") and type(v) == "table" and v.showSearchDialog then
+                annas = v
+                break
+            end
+        end
+    end
+    if annas then
+        local Ui = annas.ui_module  -- some forks expose it differently
+        -- The plugin's menu callback calls Ui.showSearchDialog(self),
+        -- but showSearchDialog is a method on the plugin instance via the Ui module.
+        -- Try direct call first, then fallback to onZlibrarySearch pattern.
+        if annas.showSearchDialog then
+            annas:showSearchDialog()
+        elseif annas.onZlibrarySearch then
+            annas:onZlibrarySearch()
+        elseif annas.showMultiSearchDialog then
+            annas:showMultiSearchDialog()
+        else
+            local InfoMessage = require("ui/widget/infomessage")
+            UIManager:show(InfoMessage:new{
+                text = _("Could not open Anna's Archive plugin."),
+            })
+        end
+    else
+        local InfoMessage = require("ui/widget/infomessage")
+        UIManager:show(InfoMessage:new{
+            text = _("annas.koplugin is not installed."),
+        })
+    end
+end
+
+local function onTabCustom(tab_id)
+    local ct
+    for _, c in ipairs(config.custom_tabs) do
+        if c.id == tab_id then ct = c; break end
+    end
+    if not ct or not ct.dispatcher_action then return end
+
+    local Dispatcher = require("dispatcher")
+    Dispatcher:dispatch({ action = ct.dispatcher_action }, { name = "bottom_navbar" })
+end
+
 local tab_callbacks = {
     books = onTabBooks,
     manga = onTabManga,
@@ -338,9 +441,23 @@ local tab_callbacks = {
     favorites = onTabFavorites,
     collections = onTabCollections,
     zlib = onTabZlib,
+    annas = onTabAnnas,
     appstore = onTabAppStore,
     exit = onTabExit,
 }
+
+local function getTabCallback(tab_id)
+    if tab_callbacks[tab_id] then
+        return tab_callbacks[tab_id]
+    end
+    -- Check if it's a custom tab
+    for _, ct in ipairs(config.custom_tabs) do
+        if ct.id == tab_id then
+            return function() onTabCustom(tab_id) end
+        end
+    end
+    return nil
+end
 
 -- === Color text support ===
 -- TextWidget uses colorblitFrom which converts RGB to grayscale.
@@ -629,7 +746,7 @@ local function createNavBar()
         local idx = math.floor(tap_x / tab_w) + 1
         idx = math.max(1, math.min(#visible_tabs, idx))
         local tapped_id = visible_tabs[idx].id
-        local cb = tab_callbacks[tapped_id]
+        local cb = getTabCallback(tapped_id)
         if cb then cb() end
         -- Only update active tab for tabs that stay in the file browser
         local stays_in_browser = tapped_id == "books"
@@ -836,7 +953,7 @@ injectStandaloneNavbar = function(menu, view_tab_id)
         setActiveTab(tapped_id)
 
         -- Execute the tapped tab's callback
-        local cb = tab_callbacks[tapped_id]
+        local cb = getTabCallback(tapped_id)
         if cb then cb() end
 
         return true
@@ -976,7 +1093,7 @@ hookQuickRSSInit = function()
             if tapped_id == "news" then return true end
             self:onClose()
             setActiveTab(tapped_id)
-            local cb = tab_callbacks[tapped_id]
+            local cb = getTabCallback(tapped_id)
             if cb then cb() end
             return true
         end
@@ -1351,6 +1468,14 @@ function FileManagerMenu:setUpdateItemTable()
                         checked_func = function() return config.show_tabs.zlib end,
                         callback = function()
                             config.show_tabs.zlib = not config.show_tabs.zlib
+                            G_reader_settings:saveSetting("bottom_navbar", config)
+                        end,
+                    },
+                    {
+                        text = _("Anna's Archive"),
+                        checked_func = function() return config.show_tabs.annas end,
+                        callback = function()
+                            config.show_tabs.annas = not config.show_tabs.annas
                             G_reader_settings:saveSetting("bottom_navbar", config)
                         end,
                     },
