@@ -58,12 +58,12 @@ Enjoy your beautiful new screensaver!
 
 # KOReader Custom Bottom Navigation Bar
 
-A fork of [qewer33/koreader-patches](https://github.com/qewer33/koreader-patches) that adds a fully customizable tab bar at the bottom of the KOReader File Manager, with added support for **Z-Library** and **AppStore** tabs.
+A fork of [qewer33/koreader-patches](https://github.com/qewer33/koreader-patches) that adds a fully customizable tab bar at the bottom of the KOReader File Manager, with added support for **Z-Library**, **Anna's Archive** and **AppStore** tabs.
 
 **[Download the Patch (2-custom-navbar.lua)](https://github.com/PedroMachado1/patches-plugins-for-koreader/blob/main/2-custom-navbar.lua)**
 
 <p align="center">
-  <img src="./images/FileManager_2026-03-07_212859.png" width="60%" alt="Custom Navigation Bar Preview">
+  <img src="./images/FileManager_2026-03-07_233345.png" width="60%" alt="Custom Navigation Bar Preview">
 </p>
 
 ## ✨ Features
@@ -86,6 +86,7 @@ A fork of [qewer33/koreader-patches](https://github.com/qewer33/koreader-patches
 | **Favorites** | Open favorites list |
 | **Collections** | Open collections list |
 | **Z-Lib** | Open the Z-Library plugin *(requires zlibrary.koplugin)* |
+| **Anna's** | Open the Anna's Archive plugin *(requires annas.koplugin)* |
 | **AppStore** | Open the AppStore plugin *(requires appstore.koplugin)* |
 | **Exit** | Close KOReader |
 
@@ -104,13 +105,14 @@ After installation, access the settings via the **≡ (hamburger) menu** in the 
 
 From there you can toggle individual tabs on/off, change the active tab color, toggle labels, and more.
 
-## 🔌 Plugin Tabs (Z-Lib & AppStore)
+## 🔌 Plugin Tabs (Z-Lib, Anna's Archive & AppStore)
 
-The **Z-Lib** and **AppStore** tabs are disabled by default. To enable them:
+The **Z-Lib**, **Anna's** and **AppStore** tabs are disabled by default. To enable them:
 
-1. Make sure `zlibrary.koplugin` and/or `appstore.koplugin` are installed in your `koreader/plugins/` directory.
+1. Make sure `zlibrary.koplugin`, `annas.koplugin` and/or `appstore.koplugin` are installed in your `koreader/plugins/` directory.
 2. Go to `File Manager Menu → Settings → Bottom Navigation Bar → Tabs`.
-3. Enable the **Z-Lib** and/or **AppStore** toggles.
+3. Enable the **Z-Lib**, **Anna's** and/or **AppStore** toggles.
 
 > These tabs were added in this fork and are not present in the original patch.
+>
 > 
